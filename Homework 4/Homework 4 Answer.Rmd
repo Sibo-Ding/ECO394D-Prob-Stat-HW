@@ -1,0 +1,146 @@
+---
+title: "ECO394D Probability and Statistics Homework 4"
+author: "Sibo Ding"
+date: "Summer 2023"
+output: word_document
+---
+
+```{r include=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+## Problem 1
+### Part A
+Question: Does one of "Living with Ed" and "My Name is Earl" have a higher mean `Q1_Happy` than the other?  
+Approach: 2-sample two-sided t-test  
+Results:
+```{r echo=FALSE}
+nbc <- read.csv("nbc_pilotsurvey.csv")
+
+lwe <- nbc |> filter(Show == "Living with Ed") |> select(Q1_Happy)
+mni <- nbc |> filter(Show == "My Name is Earl") |> select(Q1_Happy)
+
+t.test(lwe, mni)
+```
+Conclusion: p-value is greater than 0.05 (or 95% confidence interval includes 0). We cannot reject $H_0$ so no one show has a higher mean `Q1_Happy` at 5% significance.
+
+### Part B
+Question: Does one of "The Biggest Loser" and "The Apprentice: Los Angeles" have a higher mean `Q1_Annoyed` than the other?  
+Approach: 2-sample two-sided t-test  
+Results:
+```{r echo=FALSE}
+tbl <- nbc |> filter(Show == "The Biggest Loser") |> select(Q1_Annoyed)
+tal <- nbc |> filter(Show == "The Apprentice: Los Angeles") |> select(Q1_Annoyed)
+
+t.test(tbl, tal)
+```
+Conclusion: p-value is smaller than 0.05 (or 95% confidence interval does not include 0). We reject $H_0$ so one show has a higher mean `Q1_Annoyed` at 5% significance.
+
+### Part C
+Question: Use a filtered data set to infer the proportion of 4 or grater `Q2_Confusing` of "Dancing with the Stars" with its 95% confidence interval.  
+Approach 1: 1-sample proportions test  
+Results:
+```{r echo=FALSE}
+dwt <- nbc |> filter(Show == "Dancing with the Stars") |> select(Q2_Confusing)
+
+prop.test(sum(dwt$Q2_Confusing >= 4),
+          n = length(dwt$Q2_Confusing >= 4))
+```
+
+Approach 2: Normal approximation for binomial distribution (based on C.L.T.)  
+Results:  
+Actual proportion $p=$
+```{r echo=FALSE}
+p <- mean(dwt$Q2_Confusing >= 4)
+p
+```
+Sample size $n=$
+```{r echo=FALSE}
+n <- as.numeric(count(dwt))
+n
+```
+$\hat{p} \sim N(p, \frac{p(1-p)}{n})=N(0.0773, 0.0199^2)$  
+$E(\hat{p}) = p = 0.0773$  
+$CI(p)_{0.95}= p \pm z\sqrt{\frac{p(1-p)}{n}} = 0.0773 \pm 1.96\times0.0199$
+```{r echo=FALSE}
+sd <- sqrt(p*(1-p)/n)
+cat("Lower limit:", p + qnorm(0.025)*sd)
+cat("Upper limit:", p + qnorm(0.975)*sd)
+```
+
+Approach 3: Use bootstrap and Monte Carlo simulation to generate many samples and estimate C.I..
+
+## Problem 2
+Question: Whether the revenue ratios are the same in the treatment and control groups?  
+Approach: 2-sample two-sided t-test  
+Results:
+```{r echo=FALSE}
+ebay <- read.csv("ebay.csv")
+
+control <- ebay |> filter(adwords_pause == 0) |> select(rev_ratio)
+treatment <- ebay |> filter(adwords_pause == 1) |> select(rev_ratio)
+
+t.test(control, treatment)
+```
+Conclusion: p-value is smaller than 0.05 (or 95% confidence interval does not include 0). We reject $H_0$ so the revenue ratios in the treatment and control groups are different at 5% significance.
+
+## Problem 3
+$H_0$: The proportion of flagged trades from Iron Bank is 2.4%.  
+Test statistic: $rate=\frac{70}{2021}$  
+When plotting simulation results, histogram rather than p.d.f. makes more sense:
+```{r echo=FALSE}
+set.seed(42)
+sim_iron <- mosaic::do(100000) * mean(sample(c(0, 1), 2021, replace = TRUE, prob = c(1-0.024, 0.024)))
+# replicate(100000, mean(sample(c(0, 1), 2021, replace = TRUE, prob = c(1-0.024, 0.024)))) |> tibble()
+
+ggplot(sim_iron, aes(mean)) +
+  geom_histogram(bins = 60)
+```
+
+p-value for observing $rate > \frac{70}{2021}=$
+```{r echo=FALSE}
+mean(sim_iron > 70/2021)
+```
+Conclusion: $H_0$ is not plausible in light of the data because $p<0.01$ is pretty small, which is very rare to happen.
+
+## Problem 4
+```{r echo=FALSE}
+milk <- read.csv("milk.csv")
+
+# Use log form to calculate elasticity
+set.seed(42)
+sim_el <- mosaic::do(10000) *
+  lm(log(sales) ~ log(price),
+     data = mosaic::resample(milk))$coefficients[2]
+
+ggplot(sim_el, aes(log.price.)) +
+  geom_histogram(bins = 40) +
+  xlab("Elasticity") +
+  ylab("Count") +
+  ggtitle("Histogram of 10000 bootstrap elasticities")
+
+confint(sim_el$log.price.) |> round(2)
+```
+
+## Problem 5
+### Part A
+i. $\because X_1,\dots,X_N \sim i.i.d. Bernoulli(p)$  
+$E(\hat{p}) = E(\bar{X}_N) = E(\frac{X_1+\cdots+X_N}{N})$  
+$=\frac1N(E(X_1)+\cdots+E(X_N))$  
+$=\frac1N NE(X)$  
+$=p$  
+Similarly, $E(\hat{q})=q$, thus $E(\hat{p}-\hat{q}) = E(\hat{p})-E(\hat{q}) = p-q$
+
+ii. Since $X_1,\dots,X_N \sim i.i.d. Bernoulli(p)$ having the same finite mean and variance, as $N \to \infty$, based on C.L.T., $se(\bar{X}_N) = \frac{sd(X)}{\sqrt N} = \sqrt{\frac{p(1-p)}{N}}$
+
+iii. $\because X_1,\dots,X_N \sim i.i.d. Bernoulli(p)$, $Y_1,\dots,Y_M \sim i.i.d. Bernoulli(q)$  
+Based on C.L.T., $Var(\hat{p}) = \frac{Var(X)}{N} = \frac{p(1-p)}{N}$, $Var(\hat{q}) = \frac{Var(Y)}{M} = \frac{q(1-q)}{M}$  
+$\therefore Var(\hat{p}-\hat{q}) = Var(\hat{p})+Var(\hat{q}) = \frac{p(1-p)}{N} + \frac{q(1-q)}{M}$  
+$se(\hat{p}-\hat{q}) = \sqrt{\frac{p(1-p)}{N} + \frac{q(1-q)}{M}}$
+
+### Part B
+Similar to Part A,  
+$E(\bar{X}_N-\bar{Y}_M) = E(\bar{X}_N)-E(\bar{Y}_M) = \mu_X-\mu_Y$  
+$Var(\bar{X}_N-\bar{Y}_M) = Var(\bar{X}_N)+Var(\bar{Y}_M) = \frac{\sigma_X^2}{N} + \frac{\sigma_Y^2}{M}$  
+$se(\bar{X}_N-\bar{Y}_M) = \sqrt{ \frac{\sigma_X^2}{N}+\frac{\sigma_Y^2}{M}}$

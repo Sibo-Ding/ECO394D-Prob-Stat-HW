@@ -1,2 +1,2 @@
-# ECO394D-Prob-Stat-Homeworks
- Probability and Statistics, UT Summer 2023
+# ECO394D Probability and Statistics
+UT, Summer 2023
